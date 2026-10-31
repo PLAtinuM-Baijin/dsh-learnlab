@@ -2862,8 +2862,14 @@ var app_default = (function() {
             ])
           ]),
           needsText && busy !== "transcribe" ? h("div", { className: "ll-hint", key: "need" }, [
-            "\u8FD9\u662F PDF \u8BFE\u4EF6\uFF0C\u8FD8\u6CA1\u6709\u53EF\u7528\u7684\u6587\u5B57\u3002",
-            h("button", { key: "go", className: "ll-link", onClick: () => runTranscribe() }, " \u5F00\u59CB\u9010\u9875\u8BC6\u522B")
+            "\u8FD9\u4E00\u9875\u6CA1\u6709\u53EF\u7528\u7684\u6587\u5B57\uFF0C\u6559\u7EC3\u53EA\u80FD\u770B\u56FE\u56DE\u7B54\u3002",
+            h("button", {
+              key: "go",
+              className: "ll-link",
+              onClick: () => runTranscribe(),
+              title: "\u9010\u9875\u4EA4\u7ED9\u6A21\u578B\u8F6C\u5F55\uFF0C\u6BCF\u9875\u4E00\u6B21\u8C03\u7528"
+            }, " \u8BC6\u522B\u5168\u90E8\u9875\u9762"),
+            h("span", { key: "sep" }, " \xB7 \u53EA\u8BC6\u4E00\u9875\u53EF\u5728\u8F93\u5165\u6846\u4E0A\u65B9\u70B9\u300C\u8BC6\u522B\u7B2C N \u9875\u300D")
           ]) : null
         ]) : h("div", { className: "ll-empty", key: "empty" }, [
           h("div", { key: "a", className: "ll-empty-title" }, "\u9009\u4E00\u4EFD\u8BFE\u4EF6\u5F00\u59CB"),

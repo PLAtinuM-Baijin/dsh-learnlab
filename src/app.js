@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import Icon from './components/icons.jsx'
 
 /* 由 build/client.legacy.txt 自动转换而来；逻辑未改动。 */
@@ -2352,8 +2352,14 @@ export default (function () {
               ]),
               needsText && busy !== 'transcribe'
                 ? h('div', { className: 'll-hint', key: 'need' }, [
-                  '这是 PDF 课件，还没有可用的文字。',
-                  h('button', { key: 'go', className: 'll-link', onClick: () => runTranscribe() }, ' 开始逐页识别'),
+                  '这一页没有可用的文字，教练只能看图回答。',
+                  h('button', {
+                    key: 'go',
+                    className: 'll-link',
+                    onClick: () => runTranscribe(),
+                    title: '逐页交给模型转录，每页一次调用',
+                  }, ' 识别全部页面'),
+                  h('span', { key: 'sep' }, ' · 只识一页可在输入框上方点「识别第 N 页」'),
                 ])
                 : null,
             ])

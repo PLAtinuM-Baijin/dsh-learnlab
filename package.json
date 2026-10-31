@@ -21,8 +21,7 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "index.js",
@@ -31,11 +30,9 @@
     "cordis.patch.yml",
     "THIRD-PARTY-NOTICES.md",
     "locale/*.json",
-    "icon.svg",
     "src/**/*.js",
     "src/**/*.jsx"
   ],
-  "icon": "./icon.svg",
   "scripts": {
     "build": "node build/build.mjs",
     "check": "node --check index.js && node --check client.js",

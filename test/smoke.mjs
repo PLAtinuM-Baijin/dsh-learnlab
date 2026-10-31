@@ -16,6 +16,23 @@ const check = (label, ok) => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}`)
 }
 
+/* --- 声明过的文件必须真的存在 -------------------------------------------
+ * DSH 扫描插件元信息时会对 package.json 里声明的路径做 lstat，
+ * 指向不存在的文件会直接抛 ENOENT（曾经因为删了 icon.svg 但没清声明踩过）。
+ */
+const declared = []
+const declare = (label, relative) => {
+  if (typeof relative === 'string' && !relative.includes('*')) declared.push([label, relative])
+}
+declare('icon', pkg.icon)
+declare('dsh.bundle.patch', pkg.dsh?.bundle?.patch)
+for (const [key, target] of Object.entries(pkg.exports ?? {})) declare(`exports["${key}"]`, target)
+for (const entry of pkg.files ?? []) declare(`files: ${entry}`, entry)
+for (const [label, relative] of declared) {
+  const absolute = path.resolve(root, relative)
+  check(`声明的文件存在：${label} -> ${relative}`, fs.existsSync(absolute))
+}
+
 // 最小 React 替身：只够组件定义通过，不渲染
 const React = {
   createElement: (type, props, ...children) => ({ type, props, children }),
