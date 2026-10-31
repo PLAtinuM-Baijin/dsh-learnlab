@@ -1,0 +1,16 @@
+{
+  "name": "learnlab-build",
+  "private": true,
+  "type": "module",
+  "description": "LearnLab 前端构建（不随插件安装）",
+  "dependencies": {
+    "@esbuild/win32-x64": "0.28.2",
+    "esbuild": "^0.28.0",
+    "lucide-react": "^0.470.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

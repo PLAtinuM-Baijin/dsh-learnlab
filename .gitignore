@@ -1,0 +1,15 @@
+node_modules/
+build/node_modules/
+build/app.cjs
+
+.config.json
+课件库/
+课件源文件/
+*.pptx
+*.ppt
+*.docx
+.pdf
+
+*.log
+.DS_Store
+Thumbs.db
