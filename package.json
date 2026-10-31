@@ -1,6 +1,6 @@
 {
   "name": "dsh-learnlab",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "把课件变成可以边看边问、边问边记的学习空间：原样浏览 PPT、按页提问、页码锚定笔记、涂画、双课件对比、独立翻译通道。A deck-centric study workspace plugin for DeepSeek Harness.",
   "license": "MIT",
   "type": "module",
@@ -43,11 +43,15 @@
     "lucide-react": "^0.470.0"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-sidebar"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
     }
   }
 }
