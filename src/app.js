@@ -1,10 +1,49 @@
 import React from 'react'
+import katex from 'katex'
+import katexCss from '../build/katex-css.js'
 import Icon from './components/icons.jsx'
 
 /* 由 build/client.legacy.txt 自动转换而来；逻辑未改动。 */
 export default (function () {
     const h = React.createElement
     const { useState, useEffect, useRef, useCallback, useMemo } = React
+
+    const CRASH_CSS = `
+.ll-crash { padding: 24px; display: flex; flex-direction: column; gap: 10px; height: 100%; overflow: auto;
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; }
+.ll-crash-title { font-size: 14px; font-weight: 600; }
+.ll-crash-stack { margin: 0; padding: 12px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px;
+  line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 45vh; overflow: auto; }
+`
+
+    // 渲染期异常会让整个面板变成空白（看起来像黑屏），这里把它接住并显示出来
+    class PanelBoundary extends React.Component {
+      constructor(props) {
+        super(props)
+        this.state = { error: null }
+      }
+      static getDerivedStateFromError(error) {
+        return { error }
+      }
+      componentDidCatch(error, info) {
+        console.error('[learnlab] render failed:', error, info)
+      }
+      render() {
+        if (!this.state.error) return this.props.children
+        return h('div', { className: 'll-crash' }, [
+          h('style', { key: 'css' }, CRASH_CSS),
+          h('div', { key: 't', className: 'll-crash-title' }, '学习页出错了'),
+          h('div', { key: 's', className: 'll-hint' }, '把下面这段发给开发者，就能定位问题。刷新页面可以恢复。'),
+          h('pre', { key: 'm', className: 'll-crash-stack' }, String(this.state.error?.stack || this.state.error)),
+          h('button', {
+            key: 'r',
+            className: 'll-btn',
+            onClick: () => this.setState({ error: null }),
+          }, '重试'),
+        ])
+      }
+    }
 
     const API = '/api/learnlab'
     const MIN_RIGHT = 360
@@ -35,6 +74,17 @@ export default (function () {
 .ll-rail-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: .02em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ll-rail-list { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 10px; }
+.ll-rail-tools { flex: none; display: flex; gap: 6px; padding: 0 10px 8px; align-items: center; }
+.ll-rail-search { flex: 1; min-width: 0; height: 28px; padding: 0 9px; border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2); border: 1px solid transparent;
+  color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; }
+.ll-rail-search::placeholder { color: var(--dsw-alias-label-tertiary); }
+.ll-rail-search:focus { outline: none; background: var(--dsw-alias-bg-base);
+  border-color: color-mix(in srgb, var(--ll-accent) 55%, transparent); }
+.ll-rail-sort { flex: none; height: 28px; padding: 0 9px; border-radius: 8px; cursor: pointer;
+  background: var(--dsw-alias-bg-layer-2); border: 1px solid transparent;
+  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; }
+.ll-rail-sort:hover { color: var(--dsw-alias-label-primary); }
 .ll-rail-foot { flex: none; padding: 10px 16px 12px; border-top: 1px solid var(--dsw-alias-border-l1);
   font-size: 11px; color: var(--dsw-alias-label-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -46,7 +96,10 @@ export default (function () {
 .ll-deck-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 18px; }
 .ll-deck-del { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px;
   opacity: 0; transition: opacity .12s ease; }
-.ll-deck:hover .ll-deck-del, .ll-deck-del:focus-visible { opacity: 1; }
+.ll-deck-re { position: absolute; top: 4px; right: 30px; width: 24px; height: 24px;
+  opacity: 0; transition: opacity .12s ease; }
+.ll-deck:hover .ll-deck-del, .ll-deck:hover .ll-deck-re,
+.ll-deck-del:focus-visible, .ll-deck-re:focus-visible { opacity: 1; }
 .ll-deck-del:hover { color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-bg-layer-2); }
 .ll-deck-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font-size: 11px; color: var(--dsw-alias-label-secondary); }
@@ -110,7 +163,7 @@ export default (function () {
   border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
 .ll-view-close:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .ll-media { flex: 1; min-height: 0; display: flex; align-items: safe center; justify-content: safe center;
-  position: relative; padding: 2px; overflow: auto; scrollbar-gutter: stable both-edges; }
+  position: relative; padding: 2px; overflow: auto; }
 .ll-media.is-zoomed { cursor: grab; }
 .ll-media.is-panning { cursor: grabbing; }
 .ll-view-titleonly { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -266,6 +319,9 @@ export default (function () {
 .ll-md .ll-answer-label { font-size: 11px; color: var(--dsw-alias-label-secondary); margin-bottom: 4px; }
 .ll-md .ll-math-block { text-align: center; margin: 8px 0 12px; font-size: 15px; }
 .m-math { font-family: "Cambria Math", "Latin Modern Math", Georgia, serif; }
+.ll-md .katex { font-size: 1.02em; }
+.ll-md .katex-display { margin: 6px 0; }
+.m-math .m-unknown { color: var(--dsw-alias-label-tertiary); font-size: .9em; }
 .m-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center;
   margin: 0 .18em; font-size: .96em; line-height: 1.2; }
 .m-num { border-bottom: 1px solid currentColor; padding: 0 .2em; }
@@ -291,6 +347,8 @@ export default (function () {
   border: 1px solid var(--dsw-alias-border-l1); display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .ll-progress { height: 4px; border-radius: 2px; background: var(--dsw-alias-border-l1); overflow: hidden; }
 .ll-progress > i { display: block; height: 100%; background: var(--dsw-alias-brand-primary); transition: width .2s; }
+.ll-progress.is-indeterminate > i { width: 34% !important; animation: ll-indet 1.15s ease-in-out infinite; }
+@keyframes ll-indet { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
 
 /* 弹层 */
 .ll-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.34); display: flex;
@@ -460,6 +518,8 @@ export default (function () {
 .ll-skin-text { font-size: 12px; color: var(--dsw-alias-label-primary); line-height: 1.6; }
 .ll-skin-sub { font-size: 10.5px; color: var(--dsw-alias-label-secondary); margin-top: 2px; }
 .ll-skin-hr { height: 1px; background: var(--dsw-alias-border-l1); margin: 12px 0; }
+.ll-skin-build { margin-top: 10px; font-size: 10px; color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em; }
 
 /* 缩放 */
 .ll-zoom { position: absolute; right: 10px; bottom: 10px; z-index: 4; height: 24px; padding: 0 9px;
@@ -495,6 +555,66 @@ export default (function () {
 .ll-path { margin-top: 4px; padding: 6px 8px; border-radius: 7px; background: var(--dsw-alias-bg-layer-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px;
   color: var(--dsw-alias-label-secondary); word-break: break-all; }
+
+    /* ------------------------------------------------------------ 请求 */
+
+    async function api(path, options) {
+      const res = await fetch(
+.ll-crash { padding: 24px; display: flex; flex-direction: column; gap: 10px;
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); height: 100%; overflow: auto; }
+.ll-crash-title { font-size: 14px; font-weight: 600; }
+.ll-crash-stack { margin: 0; padding: 12px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px;
+  line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 45vh; overflow: auto; }
+/* ============================================================ 视觉细节 */
+/* 无边框分层：靠 1-3% 明度差分层次，边框压到几乎看不见 */
+.ll-root {
+  --ll-ring: color-mix(in srgb, var(--ll-accent) 40%, transparent);
+  --ll-ring-soft: color-mix(in srgb, var(--ll-accent) 12%, transparent);
+  --ll-hairline: color-mix(in srgb, var(--dsw-alias-border-l1) 55%, transparent);
+}
+.ll-modal, .ll-trans, .ll-skin, .ll-results, .ll-rail,
+.ll-head, .ll-tabs, .ll-rail-head, .ll-rail-foot, .ll-bottom { border-color: var(--ll-hairline); }
+.ll-card, .ll-view, .ll-deck { border-color: transparent; }
+
+/* 输入框：不要 outline，双层阴影做咬合感 */
+.ll-input:focus, .ll-textarea:focus, .ll-rail-search:focus,
+.ll-skin-input:focus, .ll-trans textarea:focus, .ll-notes-editor:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 0 0 0 1px var(--ll-ring), 0 0 0 4px var(--ll-ring-soft);
+}
+.ll-root :focus-visible { outline: none; }
+
+/* 行内图标垂直居中 */
+.ll-root svg { vertical-align: -0.125em; }
+
+/* 等宽数字，避免进度/页码跳字 */
+.ll-page-total, .ll-zoomval, .ll-msg-meta, .ll-thumb-no, .ll-deck-meta { font-variant-numeric: tabular-nums; }
+
+/* 防孤字 */
+.ll-md p, .ll-md li, .ll-msg, .ll-hint, .ll-answer { text-wrap: pretty; }
+
+/* 流式：新字从模糊到清晰 */
+@keyframes ll-ink { from { opacity: .3; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
+.ll-ink { display: inline; animation: ll-ink 90ms cubic-bezier(.215, .61, .355, 1) both; }
+
+/* 对勾：欠阻尼微弹 */
+@keyframes ll-pop { 0% { transform: scale(.82); } 55% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.ll-act.is-done { color: var(--ll-accent-ink); animation: ll-pop 380ms cubic-bezier(.34, 1.56, .64, 1); }
+
+/* 提示条：自己淡出，不用 JS 计时 */
+@keyframes ll-snack {
+  0% { opacity: 0; transform: translateY(4px); }
+  8% { opacity: 1; transform: none; }
+  88% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.ll-task.is-snack { animation: ll-snack 2500ms ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-ink, .ll-act.is-done, .ll-task.is-snack { animation: none; }
+}
 `
 
     /* ------------------------------------------------------------ 请求 */
@@ -564,127 +684,54 @@ export default (function () {
 
     /* ------------------------------------------------------------ 公式 */
 
-    const TEX_SYMBOLS = {
-      alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ',
-      eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ',
-      pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', varphi: 'φ', chi: 'χ',
-      psi: 'ψ', omega: 'ω', Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π',
-      Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
-      times: '×', cdot: '·', div: '÷', pm: '±', mp: '∓', ast: '∗', star: '⋆', circ: '∘',
-      le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', equiv: '≡',
-      sim: '∼', propto: '∝', ll: '≪', gg: '≫',
-      to: '→', rightarrow: '→', leftarrow: '←', leftrightarrow: '↔', Rightarrow: '⇒',
-      Leftarrow: '⇐', Leftrightarrow: '⇔', mapsto: '↦', uparrow: '↑', downarrow: '↓',
-      sum: '∑', prod: '∏', int: '∫', oint: '∮', iint: '∬',
-      infty: '∞', partial: '∂', nabla: '∇', forall: '∀', exists: '∃', nexists: '∄',
-      in: '∈', notin: '∉', ni: '∋', subset: '⊂', supset: '⊃', subseteq: '⊆', supseteq: '⊇',
-      cup: '∪', cap: '∩', emptyset: '∅', varnothing: '∅', setminus: '∖',
-      land: '∧', lor: '∨', lnot: '¬', neg: '¬', top: '⊤', bot: '⊥',
-      cdots: '⋯', ldots: '…', dots: '…', prime: '′', degree: '°', angle: '∠',
-      therefore: '∴', because: '∵', lfloor: '⌊', rfloor: '⌋', lceil: '⌈', rceil: '⌉',
-      langle: '⟨', rangle: '⟩', lbrace: '{', rbrace: '}', vert: '|', Vert: '‖',
-    }
-
     function escapeHtml(value) {
-      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
     }
 
-    function texToHtml(source) {
-      const src = String(source ?? '')
-      let i = 0
-
-      function readArg() {
-        if (src[i] === '{') {
-          i += 1
-          const inner = parseUntil('}')
-          i += 1
-          return inner
-        }
-        if (src[i] === '\\') return command().html
-        const ch = src[i] || ''
-        i += 1
-        return escapeHtml(ch)
+    /** 公式渲染交给 KaTeX；出错时降级成原文而不是抛异常。 */
+    function texToHtml(source, display = false) {
+      const text = String(source ?? "").trim()
+      if (!text) return ""
+      try {
+        return katex.renderToString(text, {
+          displayMode: display,
+          throwOnError: false,
+          strict: "ignore",
+          trust: false,
+        })
+      } catch {
+        return `<span class="m-texfail">${escapeHtml(text)}</span>`
       }
-
-      function command() {
-        i += 1
-        let name = ''
-        while (i < src.length && /[a-zA-Z]/.test(src[i])) {
-          name += src[i]
-          i += 1
-        }
-        if (name === 'frac' || name === 'dfrac' || name === 'tfrac') {
-          const numerator = readArg()
-          const denominator = readArg()
-          return { html: `<span class="m-frac"><span class="m-num">${numerator}</span><span class="m-den">${denominator}</span></span>` }
-        }
-        if (name === 'sqrt') return { html: `<span>√<span class="m-sqrt-body">${readArg()}</span></span>` }
-        if (name === 'text' || name === 'mathrm' || name === 'operatorname' || name === 'mathbf' || name === 'mathbb') {
-          return { html: `<span class="m-text">${readArg()}</span>` }
-        }
-        if (name === 'left' || name === 'right') {
-          const ch = src[i] || ''
-          i += 1
-          return { html: ch === '.' ? '' : escapeHtml(ch) }
-        }
-        if (TEX_SYMBOLS[name]) return { html: `<span>${TEX_SYMBOLS[name]}</span>` }
-        if (!name) {
-          const ch = src[i] || ''
-          i += 1
-          return { html: escapeHtml(ch) }
-        }
-        return { html: `<span>${escapeHtml(name)}</span>` }
-      }
-
-      function parseUntil(stop) {
-        let out = ''
-        while (i < src.length) {
-          const ch = src[i]
-          if (stop && ch === stop) break
-          if (ch === '\\') {
-            out += command().html
-            continue
-          }
-          if (ch === '{') {
-            i += 1
-            out += parseUntil('}')
-            i += 1
-            continue
-          }
-          if (ch === '^' || ch === '_') {
-            i += 1
-            const arg = readArg()
-            out += ch === '^' ? `<sup>${arg}</sup>` : `<sub>${arg}</sub>`
-            continue
-          }
-          if (ch === '&' || ch === ' ') {
-            i += 1
-            out += ' '
-            continue
-          }
-          out += escapeHtml(ch)
-          i += 1
-        }
-        return out
-      }
-
-      return parseUntil(undefined)
     }
 
     /* ------------------------------------------------------------ Markdown */
 
     function inlineNodes(text, prefix) {
       const out = []
-      const parts = String(text).split(/(\$\$[^$]+\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*|`[^`]+`)/)
+      // 同时接受 $...$ / $$...$$ 和 LaTeX 原生的 \(...\) / \[...\]
+      const parts = String(text).split(/(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$\$[^$]+\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*|`[^`]+`)/)
+      const math = (raw) => h('span', {
+        key: raw.key,
+        className: 'm-math',
+        dangerouslySetInnerHTML: { __html: texToHtml(raw.body) },
+      })
       parts.forEach((part, index) => {
         if (!part) return
         const key = `${prefix}-${index}`
-        if (part.startsWith('$$') && part.endsWith('$$') && part.length > 4) {
-          out.push(h('span', { key, className: 'm-math', dangerouslySetInnerHTML: { __html: texToHtml(part.slice(2, -2)) } }))
+        if (part.length > 4 && part.startsWith('\\[') && part.endsWith('\\]')) {
+          out.push(math({ key, body: part.slice(2, -2) }))
+        } else if (part.length > 4 && part.startsWith('\\(') && part.endsWith('\\)')) {
+          out.push(math({ key, body: part.slice(2, -2) }))
+        } else if (part.startsWith('$$') && part.endsWith('$$') && part.length > 4) {
+          out.push(math({ key, body: part.slice(2, -2) }))
         } else if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
-          out.push(h('span', { key, className: 'm-math', dangerouslySetInnerHTML: { __html: texToHtml(part.slice(1, -1)) } }))
+          // 常见写法要求 $ 紧贴内容；"5$ 一件，总共 20$" 这种散文里的 $ 不当公式
+          const body = part.slice(1, -1)
+          if (/^\s|\s$/.test(body)) out.push(part)
+          else out.push(math({ key, body }))
         } else if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-          out.push(h('strong', { key }, part.slice(2, -2)))
+          // 加粗内部要再解析一遍，否则 **$(M+1)/2$** 这种写法里的公式会原样输出
+          out.push(h('strong', { key }, inlineNodes(part.slice(2, -2), `${key}b`)))
         } else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
           out.push(h('code', { key }, part.slice(1, -1)))
         } else {
@@ -749,12 +796,56 @@ export default (function () {
           codeLang = trimmed.slice(3).trim().toLowerCase()
           continue
         }
+        // 块级公式：$$…$$ 或 \[…\]。
+        // 支持三种常见写法：
+        //   1) 同一行闭合      $$ E=mc^2 $$
+        //   2) 标记各占一行    $$  (内容若干行)  $$
+        //   3) 开标记带内容    $$ \neg(A) \iff ...
+        //                      ...  $$     ← 闭合在后续某行
+        // 向下找闭合最多 30 行；找不到就回退，当普通段落处理，绝不吞掉正文。
+        const mathOpen = trimmed.startsWith('$$') ? '$$' : trimmed.startsWith('\\[') ? '\\[' : null
+        if (mathOpen) {
+          const close = mathOpen === '$$' ? '$$' : '\\]'
+          const rest = trimmed.slice(mathOpen.length)
+          const inlineClose = rest.indexOf(close)
+          let body = null
+          if (inlineClose >= 0) {
+            body = rest.slice(0, inlineClose)
+          } else {
+            const collected = [rest]
+            let closed = false
+            let scanned = 0
+            while (i + 1 < lines.length && scanned < 30) {
+              i += 1
+              scanned += 1
+              const line = lines[i]
+              const at = line.indexOf(close)
+              if (at >= 0) {
+                collected.push(line.slice(0, at))
+                closed = true
+                break
+              }
+              collected.push(line)
+            }
+            if (closed) body = collected.join('\n')
+            else i -= scanned
+          }
+          if (body !== null && body.trim()) {
+            flushBullets()
+            blocks.push(h('div', {
+              key: `math${counter += 1}`,
+              className: 'll-md ll-math-block m-math',
+              dangerouslySetInnerHTML: { __html: texToHtml(body.trim(), true) },
+            }))
+            continue
+          }
+        }
         if (/^\$\$[\s\S]*\$\$$/.test(trimmed) && trimmed.length > 4) {
           flushBullets()
           blocks.push(h('div', {
             key: `math${counter += 1}`,
             className: 'll-md ll-math-block m-math',
-            dangerouslySetInnerHTML: { __html: texToHtml(trimmed.slice(2, -2)) },
+            dangerouslySetInnerHTML: { __html: texToHtml(trimmed.slice(2, -2), true) },
           }))
           continue
         }
@@ -840,6 +931,21 @@ export default (function () {
       return h('div', { className: 'll-md' }, blocks)
     }
 
+    // 流式输出时，最后十几个字逐字做「模糊 → 清晰」，前面的内容照常按 Markdown 渲染
+    function streamingNodes(text) {
+      const CUT = 14
+      const cut = Math.max(0, text.length - CUT)
+      const head = text.slice(0, cut)
+      const tail = text.slice(cut)
+      const nodes = []
+      if (head) nodes.push(h(Markdown, { key: 'md', text: head }))
+      nodes.push(h('span', { key: `tail-${text.length}` }, tail.split('').map((ch, i) => h('span', {
+        key: `c${i}`,
+        className: 'll-ink',
+        style: { animationDelay: `${i * 30}ms` },
+      }, ch))))
+      return nodes
+    }
     /* ------------------------------------------------------------ 幻灯片 */
 
     function SlideImage({ id, page, total, alt, zoom = 1 }) {
@@ -875,16 +981,15 @@ export default (function () {
         const media = img?.parentElement
         if (!img || !media) return undefined
         const measure = () => {
-          // 用 getBoundingClientRect 而不是 clientWidth/clientHeight：
-          // 后者会被滚动条厚度影响，放大到出现横向滚动条时高度骤减，
-          // 于是「基准变小 → 横向滚动条消失 → 高度恢复」来回震荡。
-          const rect = media.getBoundingClientRect()
-          const boxW = rect.width - 4
-          const boxH = rect.height - 4
+          // clientWidth/clientHeight 不含滚动条，是真正的可视区；
+          // 再向下取整，避免小数像素把容器顶出 1px 的滚动条。
+          // 观察器只监听 border-box 变化，滚动条出现不会触发重算，所以不会震荡。
+          const boxW = media.clientWidth - 4
+          const boxH = media.clientHeight - 4
           const ratio = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 16 / 9
           if (boxW <= 0 || boxH <= 0) return
-          const width = Math.min(boxW, boxH * ratio)
-          const height = width / ratio
+          const width = Math.floor(Math.min(boxW, boxH * ratio))
+          const height = Math.floor(width / ratio)
           // 亚像素级变化不触发重算
           setFit((prev) => (
             prev && Math.abs(prev.width - width) < 0.6 && Math.abs(prev.height - height) < 0.6
@@ -894,7 +999,7 @@ export default (function () {
         }
         measure()
         const observer = new ResizeObserver(measure)
-        observer.observe(media)
+        observer.observe(media, { box: 'border-box' })
         return () => observer.disconnect()
       }, [shown])
 
@@ -1059,7 +1164,6 @@ export default (function () {
       const [draft, setDraft] = useState('')
       const [withImage, setWithImage] = useState(false)
       const [allowDraw, setAllowDraw] = useState(false)
-      const [scope, setScope] = useState('auto')
       const [busy, setBusy] = useState('')
       const [error, setError] = useState('')
       const [snack, setSnack] = useState('')
@@ -1083,6 +1187,8 @@ export default (function () {
       })
       const [showSkin, setShowSkin] = useState(false)
       const [sourceDraft, setSourceDraft] = useState('')
+      const [libraryDraft, setLibraryDraft] = useState('')
+      const [savingLib, setSavingLib] = useState(false)
       const [savingDir, setSavingDir] = useState(false)
       const [rightWidth, setRightWidth] = useState(() => {
         try {
@@ -1094,6 +1200,29 @@ export default (function () {
       })
       const [splitRatio, setSplitRatio] = useState(0.5)
       const [panning, setPanning] = useState(null)
+      const [copiedId, setCopiedId] = useState(null)
+      const [deckPages, setDeckPages] = useState({})
+      const [deckQuery, setDeckQuery] = useState('')
+      const [deckSort, setDeckSort] = useState('title')
+      const progressTimer = useRef(0)
+
+      // 记住每份课件最后停留的页码：关掉它以后，列表卡片仍然显示正确进度
+      useEffect(() => {
+        if (!panes.length) return
+        setDeckPages((prev) => {
+          let changed = false
+          const next = { ...prev }
+          for (const item of panes) {
+            const page = item.page || 1
+            if (next[item.id] !== page) {
+              next[item.id] = page
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+      }, [panes])
+
       const [paneHeights, setPaneHeights] = useState([])
       const paneRefs = useRef([])
       const splitRef = useRef(null)
@@ -1122,6 +1251,7 @@ export default (function () {
       const stageRef = useRef(null)
 
       const pane = panes[focus] ?? null
+      const scope = pane?.scope ?? 'auto'
       const deck = pane?.data?.deck ?? null
       const pages = pane?.data?.pages?.pages ?? []
       const page = pane?.page ?? 1
@@ -1133,6 +1263,11 @@ export default (function () {
       const patchPane = useCallback((index, patch) => {
         setPanes((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
       }, [])
+
+      // 提问范围跟着每一栏走，双栏时可以各选各的
+      const setScope = useCallback((value) => {
+        patchPane(focus, { scope: value })
+      }, [focus, patchPane])
 
       const patchData = useCallback((index, patch) => {
         setPanes((prev) => prev.map((item, i) => (i === index ? { ...item, data: { ...item.data, ...patch } } : item)))
@@ -1205,7 +1340,7 @@ export default (function () {
             nextPanes[index] = loaded
             nextFocus = panes.length ? index : 0
           }
-          setPanes(nextPanes)
+          setPanes(nextPanes.map((item) => ({ ...item, scope: item.scope ?? (item.data?.deck?.kind === 'docx' ? 'deck' : 'auto') })))
           setFocus(nextFocus)
           setRailMode('pages')
         } catch (err) {
@@ -1351,7 +1486,7 @@ export default (function () {
 
       const flash = (text) => {
         setSnack(text)
-        window.setTimeout(() => setSnack(''), 2200)
+        window.setTimeout(() => setSnack(''), 2500)
       }
 
       // 缩略图列表跟随当前页，翻页后自动把当前页滚进视野
@@ -1362,7 +1497,10 @@ export default (function () {
 
       // 打开设置时把当前文件夹填进输入框
       useEffect(() => {
-        if (showSkin) setSourceDraft(server?.sourceDir ?? '')
+        if (showSkin) {
+          setSourceDraft(server?.sourceDir ?? '')
+          setLibraryDraft(server?.libraryRoot ?? '')
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [showSkin])
 
@@ -1499,6 +1637,40 @@ export default (function () {
           setError(err.message)
         } finally {
           setSavingDir(false)
+        }
+      }
+
+      const saveLibraryRoot = async (value) => {
+        setSavingLib(true)
+        try {
+          const data = await post('/settings/library', { root: value })
+          setPanes([])
+          setRailMode('decks')
+          await refreshServer()
+          setLibraryDraft(data.root)
+          flash(value ? '课件库已切换' : '已恢复自动探测')
+        } catch (err) {
+          setError(err.message)
+        } finally {
+          setSavingLib(false)
+        }
+      }
+
+      const reextractDeck = async (item) => {
+        if (!item || busy) return
+        setBusy('open')
+        try {
+          const result = await post('/deck/extract', { id: item.id })
+          await refreshServer()
+          const reloaded = await loadPane(item.id)
+          setPanes((prev) => prev.map((paneItem) => (
+            paneItem.id === item.id ? { ...reloaded, strokes: [] } : paneItem
+          )))
+          flash(`已重新提取 ${result.replaced} 页文字`)
+        } catch (err) {
+          setError(err.message)
+        } finally {
+          setBusy('')
         }
       }
 
@@ -1689,28 +1861,54 @@ export default (function () {
         if (!pane || busy) return
         setBusy('transcribe')
         setError('')
-        const total = onlyPage ? 1 : pages.length
+        const total = onlyPage ? 1 : Math.max(pages.length, 1)
         let done = 0
-        setProgress({ done: 0, total })
+        const startedAt = Date.now()
+        let usageIn = 0
+        let usageOut = 0
+        window.clearTimeout(progressTimer.current)
+        // 单页请求在返回前没有任何中间事件，所以先显示"不确定进度"，
+        // 否则整段等待期间进度条恒为 0%
+        setProgress({ done: 0, total, page: onlyPage ?? pages[0]?.page ?? 1, indeterminate: true, finished: false })
         try {
           await stream('/transcribe', { id: pane.id, pages: onlyPage ? [onlyPage] : undefined }, (event) => {
-            if (event.type === 'page-start') setProgress({ done, total, page: event.page })
-            else if (event.type === 'page-done') {
+            if (event.type === 'page-start') {
+              setProgress((prev) => (prev ? { ...prev, page: event.page } : prev))
+            } else if (event.type === 'page-done') {
               done += 1
-              setProgress({ done, total, page: event.page })
-            } else if (event.type === 'error') setError(event.message)
+              setProgress((prev) => (prev ? { ...prev, done, page: event.page, indeterminate: false } : prev))
+            } else if (event.type === 'usage') {
+              usageIn += event.usage?.inputTokens || 0
+              usageOut += event.usage?.outputTokens || 0
+              setProgress((prev) => (prev ? { ...prev, usageIn, usageOut } : prev))
+            } else if (event.type === 'error') {
+              setError(event.message)
+            }
           })
           const reloaded = await loadPane(pane.id)
           setPanes((prev) => prev.map((item, i) => (i === focus ? { ...reloaded, strokes: [] } : item)))
+          // 完成态保留一会儿再消失，让人看得到"跑完了"
+          setProgress({
+            done: total,
+            total,
+            page: onlyPage ?? null,
+            indeterminate: false,
+            finished: true,
+            ms: Date.now() - startedAt,
+            usageIn,
+            usageOut,
+          })
+          progressTimer.current = window.setTimeout(() => setProgress(null), 3800)
         } catch (err) {
           if (err.name !== 'AbortError') setError(err.message)
+          setProgress(null)
         } finally {
           setBusy('')
-          setProgress(null)
         }
       }
 
       const stopTranscribe = () => {
+        window.clearTimeout(progressTimer.current)
         setBusy('')
         setProgress(null)
       }
@@ -1825,7 +2023,7 @@ export default (function () {
                   h('span', { key: 't' }, `正在读第 ${item.p} 页…`),
                 ])
                 : item.text
-                  ? h('div', { key: 'body' }, h(Markdown, { text: item.text }))
+                  ? h('div', { key: 'body' }, item.streaming ? streamingNodes(item.text) : h(Markdown, { text: item.text }))
                   : h('div', { key: 'body', className: 'll-hint' },
                     item.stopped ? '（已暂停，这一问没有生成内容。可以「改问题」后重发。）' : item.failed ? '（这一问出错了，可以重新生成。）' : ''),
               item.role === 'a' && !item.streaming && (item.text || item.stopped || item.failed)
@@ -1840,9 +2038,14 @@ export default (function () {
                   item.text
                     ? h('button', {
                       key: 'copy',
-                      className: 'll-act',
-                      onClick: () => navigator.clipboard?.writeText(item.text),
-                    }, [h(Icon, { key: 'i', name: 'copy', size: 13 }), h('span', { key: 't' }, '复制')])
+                      className: `ll-act${copiedId === item.id ? ' is-done' : ''}`,
+                      onClick: () => {
+                        navigator.clipboard?.writeText(item.text)
+                        setCopiedId(item.id)
+                        window.setTimeout(() => setCopiedId((prev) => (prev === item.id ? null : prev)), 2500)
+                      },
+                    }, [h(Icon, { key: 'i', name: copiedId === item.id ? 'check' : 'copy', size: 13 }),
+                      h('span', { key: 't' }, copiedId === item.id ? '已复制' : '复制')])
                     : null,
                   lastA && lastA.id === item.id
                     ? h('button', {
@@ -1886,6 +2089,19 @@ export default (function () {
           ])
           : [h('div', { className: 'll-page-tag', key: 'tag' }, `第 ${page} 页`)].concat(pageMessages.map(renderMessage))
 
+      // 列表：按标题（拼音）或最近更新排序，并支持按标题过滤
+      const deckList = server?.decks ?? []
+      const deckKeyword = deckQuery.trim().toLowerCase()
+      const visibleDecks = deckList
+        .filter((item) => !deckKeyword || String(item.title || '').toLowerCase().includes(deckKeyword))
+        .sort((a, b) => {
+          if (deckSort === 'recent') return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+          return String(a.title || a.id).localeCompare(String(b.title || b.id), 'zh-CN', {
+            numeric: true,
+            sensitivity: 'base',
+          })
+        })
+
       const railBody = railMode === 'pages' && deck
         ? pages.map((item) => h('div', {
           key: item.page,
@@ -1910,8 +2126,14 @@ export default (function () {
           ? h('div', { className: 'll-hint', style: { padding: '10px 12px' } }, '正在载入…')
           : (server.decks ?? []).length === 0
             ? h('div', { className: 'll-hint', style: { padding: '10px 12px' } }, '还没有课件。点右上角「导入」，挑一个工作区里的 pptx 或 pdf。')
-            : server.decks.map((item) => {
-              const percent = Math.round(((item.progress || 1) / Math.max(item.pageCount || 1, 1)) * 100)
+            : visibleDecks.length === 0
+              ? h('div', { className: 'll-hint', style: { padding: '10px 12px' } }, `没有匹配「${deckQuery.trim()}」的课件。`)
+              : visibleDecks.map((item) => {
+              // 正在看的课件用实时页码；已经关掉的用本次会话记住的页码；
+              // 都没有才退回服务端快照（server 只在开/删/导入时刷新）
+              const opened = panes.find((paneItem) => paneItem.id === item.id)
+              const shownPage = opened ? (opened.page || 1) : (deckPages[item.id] ?? item.progress ?? 1)
+              const percent = Math.round((shownPage / Math.max(item.pageCount || 1, 1)) * 100)
               return h('div', {
                 key: item.id,
                 className: `ll-deck${deck?.id === item.id ? ' is-active' : ''}`,
@@ -1933,8 +2155,20 @@ export default (function () {
                     setConfirmDelete(item)
                   },
                 }, h(Icon, { name: 'clear', size: 13 })),
+                item.kind === 'pdf'
+                  ? h('button', {
+                    key: 'reextract',
+                    className: 'll-ibtn ll-deck-re',
+                    title: '重新提取文字层（用 PDF 里的原文替换掉识别结果）',
+                    'aria-label': `重新提取 ${item.title} 的文字`,
+                    onClick: (event) => {
+                      event.stopPropagation()
+                      reextractDeck(item)
+                    },
+                  }, h(Icon, { name: 'regen', size: 13 }))
+                  : null,
                 h('div', { className: 'll-deck-meta', key: 'm' }, [
-                  h('span', { key: 'p' }, `第 ${item.progress || 1} / ${item.pageCount || 0} 页`),
+                  h('span', { key: 'p' }, `第 ${shownPage} / ${item.pageCount || 0} 页`),
                   h('span', { key: 'k' }, item.kind === 'pdf' ? 'PDF' : item.kind === 'docx' ? 'DOC' : 'PPT'),
                 ]),
                 h('div', { className: 'll-bar', key: 'bar' }, h('i', { style: { width: `${Math.min(percent, 100)}%` } })),
@@ -2042,7 +2276,7 @@ export default (function () {
         ])
       }
 
-      return h('div', {
+      return h(PanelBoundary, null, h('div', {
         className: 'll-root',
         style: {
           position: 'relative',
@@ -2052,6 +2286,7 @@ export default (function () {
           '--dsw-alias-brand-primary': accent,
         },
       }, [
+        h('style', { key: 'katex', dangerouslySetInnerHTML: { __html: katexCss } }),
         h('style', { key: 'css' }, CSS),
 
         h('div', { className: 'll-rail', key: 'rail' }, [
@@ -2083,6 +2318,27 @@ export default (function () {
                 disabled: Boolean(importing),
                 style: { gap: 6 },
               }, [h(Icon, { key: 'i', name: 'plus', size: 14 }), h('span', { key: 't' }, '导入')]),
+            ]),
+          railMode === 'pages' && deck
+            ? null
+            : h('div', { className: 'll-rail-tools', key: 'tools' }, [
+              h('input', {
+                key: 'q',
+                className: 'll-rail-search',
+                value: deckQuery,
+                placeholder: '搜索课件…',
+                spellCheck: false,
+                onChange: (event) => setDeckQuery(event.target.value),
+                onKeyDown: (event) => {
+                  if (event.key === 'Escape') setDeckQuery('')
+                },
+              }),
+              h('button', {
+                key: 'sort',
+                className: 'll-rail-sort',
+                title: deckSort === 'title' ? '当前按名称排序，点击改为按最近更新' : '当前按最近更新排序，点击改为按名称',
+                onClick: () => setDeckSort((prev) => (prev === 'title' ? 'recent' : 'title')),
+              }, deckSort === 'title' ? '名称' : '最近'),
             ]),
           h('div', { className: 'll-rail-list', key: 'list' }, railBody),
           h('div', { className: 'll-rail-foot', key: 'foot' }, [
@@ -2159,6 +2415,41 @@ export default (function () {
                   title: server?.defaultSourceDir ?? '',
                 }, '恢复默认'),
               ]),
+              h('div', { key: 'lr', className: 'll-skin-hr' }),
+              h('div', { key: 'lt', className: 'll-skin-title' }, '课件库'),
+              h('div', { key: 'lc', className: 'll-skin-text' }, '课件、笔记、对话都存在这里'),
+              h('input', {
+                key: 'li',
+                className: 'll-skin-input',
+                value: libraryDraft,
+                spellCheck: false,
+                placeholder: server?.libraryRoot ?? '课件库目录',
+                onChange: (event) => setLibraryDraft(event.target.value),
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') saveLibraryRoot(libraryDraft)
+                  if (event.key === 'Escape') setLibraryDraft(server?.libraryRoot ?? '')
+                },
+              }),
+              h('div', { key: 'lrow', className: 'll-skin-row', style: { marginTop: 8 } }, [
+                h('button', {
+                  key: 'save',
+                  className: 'll-btn',
+                  disabled: savingLib || !libraryDraft.trim() || libraryDraft.trim() === (server?.libraryRoot ?? ''),
+                  onClick: () => saveLibraryRoot(libraryDraft),
+                }, savingLib ? '切换中…' : '切换'),
+                h('span', { key: 'g', className: 'll-grow' }),
+                h('button', {
+                  key: 'auto',
+                  className: 'll-btn-ghost',
+                  disabled: savingLib,
+                  title: '按当前工作区重新自动探测',
+                  onClick: () => saveLibraryRoot(''),
+                }, '自动探测'),
+              ]),
+              h('div', { key: 'lw', className: 'll-hint', style: { marginTop: 6 } },
+                '切换后左栏会换成新位置的课件；旧位置的文件夹不会被删除。'),
+              h('div', { key: 'build', className: 'll-skin-build' },
+                `v${typeof __LL_VERSION__ !== 'undefined' ? __LL_VERSION__ : 'dev'} · build ${typeof __LL_BUILD__ !== 'undefined' ? __LL_BUILD__ : 'dev'}`),
             ])
             : null,
         ]),
@@ -2369,16 +2660,34 @@ export default (function () {
               h('div', { key: 'c', className: 'll-hint' }, `课件会放在 ${server?.learnLabDir ?? 'LearnLab'}`),
             ]),
 
-          busy === 'transcribe'
+          progress
             ? h('div', { className: 'll-task', key: 'task' }, [
-              h('span', { key: 'l' }, `正在识别第 ${progress?.page ?? '-'} 页（${progress?.done ?? 0}/${progress?.total ?? 0}）`),
-              h('div', { key: 'bar', className: 'll-progress ll-grow' }, h('i', { style: { width: `${Math.round(((progress?.done ?? 0) / Math.max(progress?.total ?? 1, 1)) * 100)}%` } })),
-              h('button', { key: 'stop', className: 'll-btn', onClick: () => stopTranscribe() }, '停止'),
+              h('span', { key: 'l' },
+                progress.finished
+                  ? `识别完成（${progress.total} 页）· 用时 ${fmtDuration(progress.ms || 0)}`
+                    + (progress.usageIn ? ` · ↑${fmtTokens(progress.usageIn)} ↓${fmtTokens(progress.usageOut)}` : '')
+                  : `正在识别第 ${progress.page ?? '-'} 页（${progress.done}/${progress.total}）`
+                    + (progress.usageIn ? ` · ↑${fmtTokens(progress.usageIn)}` : '')),
+              h('div', {
+                key: 'bar',
+                className: `ll-progress ll-grow${progress.indeterminate ? ' is-indeterminate' : ''}`,
+              }, h('i', {
+                style: progress.indeterminate
+                  ? undefined
+                  : { width: `${Math.round(((progress.done ?? 0) / Math.max(progress.total ?? 1, 1)) * 100)}%` },
+              })),
+              !progress.finished
+                ? h('button', { key: 'stop', className: 'll-btn', onClick: () => stopTranscribe() }, '停止')
+                : null,
             ])
             : null,
 
-          snack ? h('div', { className: 'll-task', key: 'snack' }, h('span', null, snack)) : null,
+          snack ? h('div', { className: 'll-task is-snack', key: 'snack' }, h('span', null, snack)) : null,
           error ? h('div', { className: 'll-error', key: 'err' }, error) : null,
+          server?.kit && server.kit.ok === false
+            ? h('div', { className: 'll-error', key: 'kit' },
+              `课件无法显示：找不到 LibreOffice 组件（${server.kit.message ?? '未知原因'}）。文字提取仍然可用。`)
+            : null,
 
           transOpen
             ? h('div', { className: 'll-trans', key: 'trans' }, [
@@ -2719,7 +3028,7 @@ export default (function () {
               ]),
             ]))
           : null,
-      ])
+      ]))
     }
 
     function PanelIcon(props) {

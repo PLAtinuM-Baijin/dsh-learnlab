@@ -1,14 +1,19 @@
+import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 
 import { DeckStore } from './lib/store.js'
 import { extractPptx } from './lib/pptx.js'
 import { renderPages, kitStatus, convertTo } from './lib/render.js'
 import { translate, readConfig, writeConfig } from './lib/translate.js'
+import { extractPdfText } from './lib/pdf.js'
 
 export const inject = ['webServer', 'llm', 'attachments', 'agentDefaultModel', 'workingDirectory', 'workspaceRegistry']
 
 const PREFIX = '/api/learnlab'
+// 课件库根目录记在用户级文件里，不跟着「当前工作区」漂移
+const PIN_FILE = path.join(os.homedir(), '.dsh-learnlab.json')
 const MAX_BODY = 12 * 1024 * 1024
 
 /** LearnLab 落在用户的工作区里，而不是 DSH 自己的 profile 目录。 */
@@ -32,12 +37,77 @@ function resolveWorkspace(ctx) {
   }
 }
 
+/* ---------------------------------------------------------------- 库根 */
+
+function readPin() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PIN_FILE, 'utf8'))
+    return typeof raw?.root === 'string' && raw.root ? raw.root : null
+  } catch {
+    return null
+  }
+}
+
+function writePin(root) {
+  try {
+    fs.writeFileSync(PIN_FILE, `${JSON.stringify({ root }, null, 2)}\n`, 'utf8')
+  } catch {
+    /* 记不住就算了，下次再试 */
+  }
+}
+
+function deckCount(root) {
+  try {
+    const dir = path.join(root, '课件库')
+    return fs.readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).length
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * 课件库根目录必须稳定：一旦确定就钉在用户级配置（~/.dsh-learnlab.json）里。
+ * 否则切换工作区会让注册表顺序变化，整个课件库看起来"消失"。
+ */
+function resolveRoot(ctx) {
+  const pinned = readPin()
+  if (pinned && fs.existsSync(pinned)) return pinned
+
+  const candidate = path.join(resolveWorkspace(ctx), 'LearnLab')
+  if (deckCount(candidate) > 0) {
+    writePin(candidate)
+    return candidate
+  }
+
+  // 当前工作区还没有库时，优先沿用别的已知工作区里已有的库
+  let existing = null
+  let best = 0
+  try {
+    for (const item of ctx.workspaceRegistry?.list?.() ?? []) {
+      if (!item?.path) continue
+      const dir = path.join(item.path, 'LearnLab')
+      const count = deckCount(dir)
+      if (count > best) {
+        best = count
+        existing = dir
+      }
+    }
+  } catch {
+    existing = null
+  }
+
+  const root = existing ?? candidate
+  writePin(root)
+  return root
+}
+
 const COACH_SYSTEM = [
   '你是一位坐在学生旁边的课程教练，正在陪他读一份课件。',
   '你的回答要帮助他真正理解，而不是把课件再念一遍。',
   '默认结构：先给结论，再讲为什么，必要时给一个具体例子。',
   '只依据课件内容和公认常识回答；课件里没有、你也不确定的，直说不确定，不要编造。',
   '引用课件位置时写成「第 N 页」。',
+  '写公式用 $...$（行内）和 $$...$$（独占一行），不要用 \\( \\) 或 \\[ \\]，也不要拿 ASCII 字符画图。',
   '不要复述他的问题，不要客套，不要用「作为一个AI」这类说法。',
   '用中文回答，除非他要求别的语言。',
 ]
@@ -68,7 +138,7 @@ const TRANSCRIBE_SYSTEM = [
 ]
 
 export function apply(ctx) {
-  const store = new DeckStore(() => resolveWorkspace(ctx))
+  const store = new DeckStore(() => resolveWorkspace(ctx), () => resolveRoot(ctx))
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,
@@ -92,10 +162,12 @@ async function handle(ctx, store, req, res) {
       build: 'v3',
       workspace: store.workspace,
       learnLabDir: store.baseDir,
+      libraryRoot: store.rootDir,
       sourceDir: await store.sourceDir(),
       defaultSourceDir: path.join(store.rootDir, '课件源文件'),
       decks,
       model: selectionOf(ctx),
+      kit: await kitInfo(),
     })
   }
 
@@ -118,12 +190,33 @@ async function handle(ctx, store, req, res) {
     return json(res, { sourceDir: await store.sourceDir() })
   }
 
-  if (route === '/files' && method === 'GET') {
-    return json(res, { files: await store.listImportable() })
+  // 课件库根目录：可以在界面里改，不用手写配置文件
+  if (route === '/settings/library' && method === 'POST') {
+    const body = await readJson(req)
+    const raw = String(body.root ?? '').trim()
+    if (!raw) {
+      // 空值 = 清掉钉子，回到自动探测
+      try {
+        fs.rmSync(PIN_FILE, { force: true })
+      } catch {
+        /* 删不掉就算了 */
+      }
+      return json(res, { root: resolveRoot(ctx), auto: true })
+    }
+    const dir = path.resolve(raw)
+    try {
+      await fsp.mkdir(dir, { recursive: true })
+      const stat = await fsp.stat(dir)
+      if (!stat.isDirectory()) throw new Error('不是文件夹')
+    } catch (error) {
+      throw new Error(`这个路径用不了：${error.message}`)
+    }
+    writePin(dir)
+    return json(res, { root: dir, auto: false })
   }
 
-  if (route === '/health' && method === 'GET') {
-    return json(res, { kit: await kitStatus() })
+  if (route === '/files' && method === 'GET') {
+    return json(res, { files: await store.listImportable() })
   }
 
   if (route === '/translate' && method === 'POST') {
@@ -194,6 +287,33 @@ async function handle(ctx, store, req, res) {
     if (!id) throw new Error('缺少课件标识')
     const removed = await store.removeDeck(id)
     return json(res, { ok: true, id, removed })
+  }
+
+  if (route === '/deck/extract' && method === 'POST') {
+    const body = await readJson(req)
+    const id = String(body.id ?? '')
+    if (!id) throw new Error('缺少课件标识')
+    const deck = await store.readDeck(id)
+    if (deck.kind !== 'pdf') throw new Error('只有 PDF 能重新提取文字层')
+    const buffer = await fsp.readFile(deck.source)
+    const extracted = await extractPdfText(buffer)
+    const pagesData = await store.readPages(id)
+    let replaced = 0
+    pagesData.pages.forEach((item, index) => {
+      const text = extracted.pages[index]
+      if (!text || !text.trim()) return
+      if (text === item.text) return
+      item.text = text
+      item.chars = text.length
+      item.source = 'pdf'
+      replaced += 1
+    })
+    pagesData.pageCount = Math.max(pagesData.pageCount || 0, extracted.pages.length)
+    await store.writePages(id, pagesData)
+    const updated = await store.patchDeck(id, {
+      textSource: extracted.hasText ? 'pdf' : 'none',
+    })
+    return json(res, { deck: updated, pages: pagesData, replaced, total: extracted.pages.length })
   }
 
   if (route === '/progress' && method === 'POST') {
@@ -270,6 +390,7 @@ async function importDeck(ctx, store, sourcePath, report = () => {}) {
 
   let pages = { pageCount: 0, pages: [] }
   let fullText = ''
+  let pdfHasText = false
   let textError
   try {
     if (kind === 'pptx') {
@@ -303,6 +424,23 @@ async function importDeck(ctx, store, sourcePath, report = () => {}) {
       const raw = await fsp.readFile(tempTxt, 'utf8')
       await fsp.rm(path.join(meta, 'tmp'), { recursive: true, force: true }).catch(() => {})
       fullText = raw.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 120000)
+    } else if (kind === 'pdf') {
+      // 电子版 PDF 的文字层是现成的：直接抽，省掉逐页视觉识别
+      const buffer = await fsp.readFile(abs)
+      const extracted = await extractPdfText(buffer)
+      pdfHasText = extracted.hasText
+      pages = {
+        pageCount: extracted.pages.length,
+        pages: extracted.pages.map((text, index) => ({
+          page: index + 1,
+          title: `第 ${index + 1} 页`,
+          text: text ?? '',
+          notes: '',
+          lines: [],
+          chars: (text ?? '').length,
+          source: (text ?? '').trim() ? 'pdf' : 'none',
+        })),
+      }
     }
   } catch (error) {
     textError = error.message
@@ -334,7 +472,7 @@ async function importDeck(ctx, store, sourcePath, report = () => {}) {
     pageCount,
     fullText,
     outline: aligned.map((p) => ({ page: p.page, title: p.title })),
-    textSource: kind === 'pdf' ? 'none' : textError ? 'images-only' : kind === 'docx' ? 'document' : 'xml',
+    textSource: kind === 'pdf' ? (pdfHasText ? 'pdf' : 'none') : textError ? 'images-only' : kind === 'docx' ? 'document' : 'xml',
     textError,
     progress: 1,
   })
@@ -343,6 +481,15 @@ async function importDeck(ctx, store, sourcePath, report = () => {}) {
 }
 
 /* ---------------------------------------------------------------- 对话 */
+
+let kitCache = { at: 0, value: null }
+
+async function kitInfo() {
+  if (kitCache.value && Date.now() - kitCache.at < 60000) return kitCache.value
+  const value = await kitStatus()
+  kitCache = { at: Date.now(), value }
+  return value
+}
 
 function selectionOf(ctx) {
   try {
@@ -435,9 +582,31 @@ async function imageBlock(ctx, store, deckId, page) {
   return { type: 'image', attachment: ref }
 }
 
+/**
+ * 发图之前先问一下模型具不具备视觉能力。
+ * 不支持时给一句人话，而不是让 provider 抛一个含糊的 400。
+ * 查询本身失败时不拦路（有些 provider 不提供该元数据）。
+ */
+async function assertImageSupport(ctx, selection) {
+  try {
+    const info = await ctx.llm.resolveModelInfo(selection.provider, selection.model)
+    const modalities = info?.inputModalities
+    if (Array.isArray(modalities) && modalities.length > 0 && !modalities.includes('image')) {
+      throw new Error(
+        `当前模型（${selection.model}）不支持读图。`
+        + '请到 设置 → 模型 里换成多模态模型，或关掉「带图」再提问。',
+      )
+    }
+  } catch (error) {
+    if (String(error?.message ?? '').includes('不支持读图')) throw error
+    // 查询失败就放行，让真正的调用去暴露问题
+  }
+}
+
 async function* modelStream(ctx, { system, prompt, images, signal }) {
   const selection = selectionOf(ctx)
   if (!selection.provider || !selection.model) throw new Error('还没有可用的默认模型，请先在设置里选一个')
+  if (images && images.length) await assertImageSupport(ctx, selection)
   const content = [{ type: 'text', text: prompt }]
   for (const block of images ?? []) content.push(block)
   const stream = ctx.llm.stream({
@@ -656,6 +825,8 @@ async function transcribe(ctx, store, req, res) {
         signal: controller.signal,
       })) {
         if (event.type === 'text') text += event.text
+        // 用量要转出去，界面才能显示这次识别花了多少 token
+        else if (event.type === 'usage') sseSend(res, { type: 'usage', page, usage: event.usage })
       }
       const clean = text.trim()
       const item = pagesData.pages[page - 1]

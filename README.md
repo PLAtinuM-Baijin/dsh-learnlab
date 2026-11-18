@@ -6,7 +6,7 @@
 
 dsh-learnlab 给出了一种解决方案：下次看课件，只需要在 DSH 中打开，便能**自动获取课件大纲、前后页信息或原图、用户在画面上的涂改标记等**丰富上下文，让 LLM 可以**围绕课件内容精确解答问题**。
 
-![学习页面图](./figures/1.png)
+![学习页面图](https://raw.githubusercontent.com/PLAtinuM-Baijin/dsh-learnlab/main/figures/1.png)
 
 ## dsh-learnlab支持的功能
 
@@ -24,7 +24,7 @@ dsh-learnlab 给出了一种解决方案：下次看课件，只需要在 DSH �
 | **缩放** | ctrl + 鼠标滚轮或底部控件可以缩放画面，范围40%–400%。可按住 Ctrl + 鼠标拖动来移动摄像机 |
 | **搜索** | 关键词查找文件内容（需要你已经识别了本页） |
 
-![带课件上下文，回答可生图](./figures/2.png)
+![带课件上下文，回答可生图](https://raw.githubusercontent.com/PLAtinuM-Baijin/dsh-learnlab/main/figures/2.png)
 
 ## 安装
 
@@ -68,7 +68,7 @@ LearnLab/
 - 如果要用翻译，记得自己去百度翻译开账号，免费版就够用。不配置也能用免费的 MyMemory，但质量可能不如百度翻译。
 使用**百度翻译要设置 appid 和密钥**，在主视图右上角的翻译 -> 设置里填写，会保存到`LearnLab/.config.json`
 
-![学习页面图](./figures/3.png)
+![学习页面图](https://raw.githubusercontent.com/PLAtinuM-Baijin/dsh-learnlab/main/figures/3.png)
 
 ## 限制与依赖
 
@@ -82,7 +82,9 @@ LearnLab/
 
 - **DSH ≥ 0.2.1-rc.2**（此插件用到了 `webServer`、`llm`、`agentDefaultModel`、`attachments` 等服务，以及 `sidebar.panellist` / `main` 槽位）
 
-- **渲染依赖 DSH 随安装包附带的 LibreOffice Kit**。插件会从 DSH 安装目录探测它；如果你的 DSH 没有这个组件，课件页会渲染失败（文字解析仍然可用）
+- **渲染依赖 DSH 随安装包附带的**`LibreOffice Kit`。插件会从 DSH 安装目录探测它；如果你的 DSH 没有这个组件，课件页会渲染失败（文字解析仍然可用）。`LibreOffice Kit`在某些情况下会导致课件中一些公式渲染错误，有文字层文件的文字提取不受影响，扫描件的文字提取会受影响。
+
+- **PDF文字提取依赖**`pdfjs-dist`，约 10 MB。
 
 ## 再开发
 
@@ -98,3 +100,27 @@ pnpm build        # 产出 client.js
 ## 许可证
 
 MIT。第三方组件见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+## 更新记录
+
+### 0.2.0
+
+#### 优化
+
+| 项目 | 描述 |
+|---|---|
+| **PDF优先读文字层** | 对于已经识别过的 PDF 课件，其左栏卡片上有一个 **↻**，点击可用原文替换之前的识别结果 |
+| **识别结果反馈** | 会显示识别耗时、token 花费 |
+| **读图报错提示** | 不支持读图的模型会提示换多模态模型。 |
+| **公式渲染** | 现在使用KaTeX，并修复了双钱币符号跨行、加粗内的公式、\\( \\)隔离符解析失败的问题 |
+| **少量UI** | 优化了部分边框、聚焦、图标对齐、文字等宽的相关UI与显示 |
+| **左侧栏课件排序** | 可选字典序排序和最近使用排序，同时支持搜索 |
+
+#### 修复
+
+| 项目 | 结果 |
+|---|---|
+| **左栏进度回退** | 现在所有课件的进度都能实时更新并保存 |
+| **单页识别进度条始终为空** | 单页识别进度条改为加载示意 |
+| **双课件对比提问范围互相干扰** | 两份课件的提问范围独立，不再互相干扰 |
+| **修改工作区后课件文件夹路径丢失** | 现在课件文件夹路径不随 DSH 工作区改变 |

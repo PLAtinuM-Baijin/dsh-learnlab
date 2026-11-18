@@ -1,7 +1,12 @@
+# 依赖与构建产物
 node_modules/
 build/node_modules/
 build/app.cjs
 
+# KaTeX 样式（构建时生成，已内联进 client.js）
+build/katex-css.js
+
+# 个人数据：绝不提交
 .config.json
 课件库/
 课件源文件/
@@ -10,6 +15,10 @@ build/app.cjs
 *.docx
 .pdf
 
+# 待办清单
+ROADMAP.md
+
+# 杂项
 *.log
 .DS_Store
 Thumbs.db

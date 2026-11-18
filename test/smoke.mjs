@@ -33,8 +33,28 @@ for (const [label, relative] of declared) {
   check(`声明的文件存在：${label} -> ${relative}`, fs.existsSync(absolute))
 }
 
+/* --- client.js 不能比源码旧 ---------------------------------------------
+ * 曾经出现过「构建戳是新的、代码却是旧的」：esbuild 悄悄失败，
+ * wrap.mjs 照样打了新时间戳。发布前必须拦住这种产物。
+ */
+const newestUnder = (dir) => {
+  let newest = 0
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) newest = Math.max(newest, newestUnder(full))
+    else newest = Math.max(newest, fs.statSync(full).mtimeMs)
+  }
+  return newest
+}
+check(
+  'client.js 不比 src/ 旧（否则需要重新构建）',
+  fs.statSync(path.join(root, 'client.js')).mtimeMs + 1000 >= newestUnder(path.join(root, 'src')),
+)
+
 // 最小 React 替身：只够组件定义通过，不渲染
 const React = {
+  // 错误边界用的是 class 组件，stub 里也要有 Component
+  Component: class { constructor(props) { this.props = props } setState() {} },
   createElement: (type, props, ...children) => ({ type, props, children }),
   forwardRef: (render) => render,
   memo: (component) => component,
